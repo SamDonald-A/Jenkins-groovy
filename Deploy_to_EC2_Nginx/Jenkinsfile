@@ -1,0 +1,62 @@
+pipeline {
+    agent any
+
+// Setup your ENV's
+    environment{
+        GITREPO = "https://github.com/SamDonald-A/sam-jenkins-lab.git" //replace your git repo
+        SSH_KEY_ID = "cicdsam" // The SSH_KEY_ID is saved in the Jenkins credentials
+        EC2_USERNAME = "ubuntu" // your EC2 user (ec2@user or ubuntu)
+        EC2_HOST = "18.175.219.73" // Your EC2 IP - this also can be saved in the Jenkins credentials
+    }
+
+
+    stages {
+        // Simple & Sample stage
+        stage('Hello') {
+            steps {
+                echo 'Hello World'
+            }
+        }
+        // Check the Git code using git branch and git repo link which is in the ENV
+        stage('git checkout'){
+            steps{
+                git branch: 'main', url: "${env.GITREPO}"
+            }
+        }
+
+        // This is running in the Jenkins server to check whether Git files are copied or not
+        // When we do ls -al we can see the Git files are copied first in to the Jenkins workspace 
+        stage("run linux commands"){
+            steps{
+                sh """
+                    ls -al
+                    pwd
+                    whoami
+                """
+            }
+        }
+        
+        // Now from the Jenkins we are coping to EC2 Server
+        stage("Copy to Ec2"){
+            steps{
+                sshagent(credentials: ["${env.SSH_KEY_ID}"]) {
+                    sh """
+                        scp -o StrictHostKeyChecking=no -r * ${env.EC2_USERNAME}@${env.EC2_HOST}:/home/ubuntu
+                    """
+                }
+            }
+        }
+           // Now from the home/ubuntu to Nginx
+           stage("Copy file to Nginx"){
+            steps{
+                sshagent(credentials: ["${env.SSH_KEY_ID}"]) {
+                    sh """
+                       ssh -o StrictHostKeyChecking=no ${env.EC2_USERNAME}@${env.EC2_HOST} '
+                       sudo mv /home/ubuntu/* /var/www/html
+                       ' 
+                    """
+                }
+            }
+        }
+    }
+}
