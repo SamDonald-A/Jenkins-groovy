@@ -1,0 +1,62 @@
+pipeline {
+    agent any
+
+    // Mention credentials that are saved in the Jenkins Credentials or pass directly like Git link passed here
+    environment {
+        GITREPO = "https://github.com/SamDonald-A/SampleHTMLB3.git" // replace your git
+        DOCKER_CRED = "sam-docker-credit" // Docker Hub Repo name & Password or Token that saved in the Jenkins credentials
+        DOCKER_IMAGE = "samdonalda/nginx" // name for your New image that gonna build in this pipeline
+    }
+
+    stages {
+        // Sample Code
+        stage('Hello') {
+            steps {
+                echo 'Hello World'
+            }
+        }
+        // Check the code in the main branch on git
+        stage('Git Checkout') {
+            steps {
+                git branch: 'main', url: "${env.GITREPO}"
+            }
+        }
+        // Runs some cmd in the Jenkins server
+        stage("Run Linux Commands") {
+            steps {
+                sh """
+                    ls -al
+                    pwd
+                    whoami
+                """
+            }
+        }
+        // Building image using provided image name in environment
+        stage("Build Docker Image") {
+            steps {
+                script {
+                    sh "docker build -t ${DOCKER_IMAGE} ."
+                }
+            }
+        }
+        // New image sent to the DockerHub using Credentials that saved in Jenkins Credentials
+        stage("Push Docker Image") {
+            steps {
+                script {
+                    docker.withRegistry('', DOCKER_CRED) {
+                        docker.image("${DOCKER_IMAGE}").push()
+                    }
+                }
+            }
+        }
+    }
+}
+// Setting up the Slack App for the Success or failure messages - Need pre-configuration for slack App to receive message
+post {
+        success {
+            slackSend(channel: '#sam-jenkins-channel', message: "Build succeeded for ${env.JOB_NAME} #${env.BUILD_NUMBER}")
+        }
+        failure {
+            slackSend(channel: '#sam-jenkins-channe', message: "Build failed for ${env.JOB_NAME} #${env.BUILD_NUMBER}")
+        }
+}
